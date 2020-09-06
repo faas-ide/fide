@@ -1,6 +1,6 @@
 ---
 kep-number: 1
-short-desc: Use Fide against different backends (like Tekton, OpenFaas, AWS Lambda, Google Cloud Run)
+short-desc: Use Fide against different backends (like Tekton, OpenFaas, AWS Lambda, Google Cloud Functions)
 title: Support Multiple Backends
 authors:
   - "@DanielMSchmidt"
@@ -39,7 +39,7 @@ A table of contents is helpful for quickly jumping to sections of a KEP and for 
 
 ## Summary
 
-To make Fide useful to a variety of FAAS enthusiasts we want to support running Fide against multiple backends like Tekton on Kubernetes, OpenFAAS on Kubernetes, AWS Lambda Function, and Google Cloud Run.
+To make Fide useful to a variety of FAAS enthusiasts we want to support running Fide against multiple backends like Tekton on Kubernetes, OpenFAAS on Kubernetes, AWS Lambda Function, and Google Cloud Functions.
 Finding an abstraction that supports all of these offerings, leveraging their strengths while also allowing Fide to make use of its features is crucial to having a good development workflow.
 
 ## Motivation
@@ -50,7 +50,7 @@ Fide must also be able to adjust to the environment it's deployed in. On Kuberne
 
 ### Goals
 
-- Support Tekton on Kubernetes, OpenFAAS on Kubernetes, AWS Lambda Function, and Google Cloud Run as backends for the FAAS offering in Fide
+- Support Tekton on Kubernetes, OpenFAAS on Kubernetes, AWS Lambda Function, and Google Cloud Functions as backends for the FAAS offering in Fide
 - Seamlessly integrate into the backend of our choice, showing rich information
 - Allow the open source community to extend fide with their own FAAS solution, ideally without needing to add source code to Fide itself.
 
