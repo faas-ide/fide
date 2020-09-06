@@ -17,7 +17,6 @@ superseded-by:
 
 # Support Multiple Backends
 
-
 ## Table of Contents
 
 A table of contents is helpful for quickly jumping to sections of a KEP and for highlighting any additional information provided beyond the standard KEP template.
@@ -30,18 +29,13 @@ A table of contents is helpful for quickly jumping to sections of a KEP and for 
     - [Goals](#goals)
     - [Non-Goals](#non-goals)
   - [Proposal](#proposal)
-    - [User Stories [optional]](#user-stories-optional)
-      - [Story 1](#story-1)
-      - [Story 2](#story-2)
-    - [Implementation Details/Notes/Constraints [optional]](#implementation-detailsnotesconstraints-optional)
+    - [Implementation Details/Notes/Constraints](#implementation-detailsnotesconstraints)
     - [Risks and Mitigations](#risks-and-mitigations)
   - [Graduation Criteria](#graduation-criteria)
-  - [Implementation History](#implementation-history)
-  - [Drawbacks [optional]](#drawbacks-optional)
-  - [Alternatives [optional]](#alternatives-optional)
-  - [Infrastructure Needed [optional]](#infrastructure-needed-optional)
+  - [Alternatives](#alternatives)
+    - [Self-expressing providers](#self-expressing-providers)
 
-[Tools for generating]: https://github.com/ekalinin/github-markdown-toc
+[tools for generating]: https://github.com/ekalinin/github-markdown-toc
 
 ## Summary
 
@@ -64,64 +58,146 @@ Fide must also be able to adjust to the environment it's deployed in. On Kuberne
 
 - Support multiple backends at the same point in time. While ideally this option should be achievable with the chosen design it is not a priority as of right now.
 - Enhance information shown with external information like logs, or metrics. While this is a goal we pursuit it is outside of the scope of this document.
+- Describe the plugin loading mechanism. This is dependant on the language of choice and seen as an implementation detail.
 
 ## Proposal
 
-This is where we get down to the nitty gritty of what the proposal actually is.
+We want to enable said goals by implementing a plugin architecture that defines a contract for a FAAS Provider to fulfil to be compatible with Fide. The interface will look like this:
 
-### User Stories [optional]
+```ts
+// Typescript is used for illustration purposes and does not need to be the language of choice
+// The final language we want to use is still TBD.
 
-Detail the things that people will be able to do if this KEP is implemented.
-Include as much detail as possible so that people can understand the "how" of the system.
-The goal here is to make this feel real for users without getting bogged down.
+// Imported from Fide
+type StringValidator = (value: unknown) => string;
+type NumberValidator = (value: unknown) => number;
+type BooleanValidator = (value: unknown) => boolean;
+type Validator = StringValidator | NumberValidator | BooleanValidator;
+type ExecutionContextSchema = Record<string, Validator>;
+type ExecutionContext = Record<string, string | boolean | number>;
 
-#### Story 1
+export const providerId = "my-provider";
+export const executionContext: ExecutionContextSchema = {
+  // e.g. for AWS
+  awsProfile: string(),
 
-#### Story 2
+  // e.g. for Kubernetes
+  kubeConfig: string(),
+};
 
-### Implementation Details/Notes/Constraints [optional]
+export function validateContext(context: ExecutionContext) {
+  // e.g. for AWS
+  try {
+    awsClient.checkPermissions({ profile: context.awsProfile });
+  } catch (e) {
+    throw new PermissionError(
+      "You are missing access to s3, please check your AWS configuration"
+    );
+  }
 
-What are the caveats to the implementation?
-What are some important details that didn't come across above.
-Go in to as much detail as necessary here.
-This might be a good place to talk about core concepts and how they releate.
+  // e.g. for Kubernetes
+  const client = new Client(context.kubeConfig);
+  try {
+    client.getPods();
+  } catch (e) {
+    throw new PermissionError(
+      "You are missing access to get pods, please check your kubeconfig"
+    );
+  }
+}
+
+// global provider-wide id
+type ID = string;
+
+// AWS ELB or Kubernetes Ingress Resource
+type Ingress = {
+  id: ID,
+  address: string,
+  port: number,
+};
+
+type Route = {
+  id: ID,
+  ingress: ID,
+  path: string,
+};
+
+type Function = {
+  id: ID,
+  route: ID,
+  parameters: Record<string, string | number | boolean>,
+  name: string,
+  fs: Filesystem,
+};
+
+type Filesystem = {
+  files: File[],
+};
+
+type File = {
+  path: string,
+  content: string,
+};
+
+type Component = Ingress | Route | Function;
+type State = {
+  entities: Component[],
+};
+
+type EntryFormat = {
+  headline: string,
+  data: string,
+};
+
+type GraphFormat = {
+  headline?: string,
+  data: string[][],
+  color: string,
+  line: string,
+};
+
+type TableFormat = {
+  headline?: string,
+  data: string[][],
+};
+
+type MetaFormat = EntryFormat | GraphFormat | TableFormat;
+
+type Meta = {
+  id: ID,
+  position?: number,
+} & MetaFormat;
+
+export function getState(): State {}
+export function get(componentId: ID): Component {}
+export function getMetadata(componentId: ID): Meta[] {}
+export function create(component: Omit<Component, "id">): Component {}
+export function update(component: Component): boolean {}
+export function delete(component: Component): boolean {}
+export function watch(
+  ids?: string[],
+  onData: (data: Component[]) => void,
+  onError: (error: Error) => void
+): void {}
+```
+
+### Implementation Details/Notes/Constraints
+
+The language of our choice needs to support a plugin system.
 
 ### Risks and Mitigations
 
-What are the risks of this proposal and how do we mitigate.
-Think broadly.
-For example, consider both security and how this will impact the larger kubernetes ecosystem.
+This implementation chooses to use the lowest common denominator between the platform. This can lead to a sub-par experience using Fide as information is missing or it can widen the interface over time, making it harder for provider creators to keep up with the ecosystem.
+The meta component mitigates this problem as it allows the creator of a provider to extend the pre-defined interface with information important to their platform while keeping an integrated look to the user by keeping the UI Components themselves within the authority of Fide.
 
 ## Graduation Criteria
 
-How will we know that this has succeeded?
-Gathering user feedback is crucial for building high quality experiences and owners have the important responsibility of setting milestones for stability and completeness.
-Hopefully the content previously contained in [umbrella issues][] will be tracked in the `Graduation Criteria` section.
+The implementation is finished when all workflows of Fide are implemented for one backend provider through the plugin interface.
 
-[umbrella issues]: https://github.com/kubernetes/kubernetes/issues/42752
+## Alternatives
 
-## Implementation History
+### Self-expressing providers
 
-Major milestones in the life cycle of a KEP should be tracked in `Implementation History`.
-Major milestones might include
-
-- the `Summary` and `Motivation` sections being merged signaling owner acceptance
-- the `Proposal` section being merged signaling agreement on a proposed design
-- the date implementation started
-- the first release where an initial version of the KEP was available
-- the version of Fide where the KEP graduated to general availability
-- when the KEP was retired or superseded
-
-## Drawbacks [optional]
-
-Why should this KEP _not_ be implemented.
-
-## Alternatives [optional]
-
-Similar to the `Drawbacks` section the `Alternatives` section is used to highlight and record other possible approaches to delivering the value proposed by a KEP.
-
-## Infrastructure Needed [optional]
-
-Use this section if you need things from the project/owner.
-Examples include a new subproject, repos requested, github details.
-Listing these here allows an owner to get the process for these resources started right away.
+Instead of defining the interface on the data level, we could define it on the UI level.
+The provider would be in charge of declaring its interface directly and Fide would use this to render the view. This would allow providers to freely express the interface best suited for their provider directly. The work required to get a provider going would not only need detailed knowledge on the FAAS provider but also a good grasp on UI concepts making the entry-barrier for new providers higher.
+We decided against this as loosening up the interface is easier than tightening it once providers are out in the wild.
