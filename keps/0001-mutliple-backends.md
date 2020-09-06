@@ -181,6 +181,10 @@ export function watch(
 ): void {}
 ```
 
+To display meta information in a useful way we include it in the overview page in a separate modal / subview so it can be loaded in a separate request. The provider can decide what to show, one example could look like this:
+
+![Overview Detail example for Tekton on Kubernetes](../img/overviewDetail.svg)
+
 ### Implementation Details/Notes/Constraints
 
 The language of our choice needs to support a plugin system.
